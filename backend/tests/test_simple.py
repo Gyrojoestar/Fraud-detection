@@ -1,7 +1,7 @@
 import unittest
 
-class simpleTest(unittest.TestCase):
-    def passed(self):
+class TestSimple(unittest.TestCase):
+    def test_passed(self):
         pass
     
 if __name__ == "__main__":
