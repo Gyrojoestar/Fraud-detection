@@ -17,26 +17,20 @@ print("===Fraud===")
 print(df[df['Class'] == 1]['Amount'].sort_values(ascending=False).head(10))
 print(df[df['Class'] == 1]['Amount'].describe())
 
-X = df.drop(columns=["Class"])
-y = df["Class"]
+df = df.sort_values(by="Time").reset_index(drop=True)
 
-# use train test split to evenly split the data, keep = use to simulate real time transaction
-# add = add to supabase
-keep_1, add_1, keep_2, add_2 = train_test_split(X, y, test_size=0.5, random_state=random_state, stratify=y)
+split_idx = int(len(df) * 0.90)
 
-keep_1 = keep_1.reset_index(drop=True)
-keep_2 = keep_2.reset_index(drop=True)
-add_1 = add_1.reset_index(drop=True)
-add_2 = add_2.reset_index(drop=True)
-# combine to make the full csv with class column, drop index column
-keep = pd.concat([keep_1, keep_2], axis=1).reset_index(drop=True)
-add = pd.concat([add_1, add_2], axis=1).reset_index(drop=True)
+keep = df.iloc[:split_idx]
+add = df.iloc[split_idx:]
+
+keep['Time'] = keep['Time'].astype(int)
+add['Time'] = add['Time'].astype(int)
+
+keep.columns = keep.columns.str.lower()
+add.columns = add.columns.str.lower()
 
 print(f"Length of dataset to keep: {len(keep)}, Length of dataset to add to supabase: {len(add)}")
-
-# change from float to int (1.0 to 1) for supabase compatibility, follow original dataset format
-keep["Time"] = keep_1["Time"].astype(int)
-add["Time"] = add_1["Time"].astype(int)
 
 df_list = [keep, add]
 output_path = ["creditCardSupabase.csv", "creditCardRealTime.csv"]

@@ -54,5 +54,15 @@ session = Session(engine)
 
 stmt = select(creditCard).where(creditCard.Class == True).limit(10)
 
+transaction_list = []
 for row in session.scalars(stmt).all():
-    print(row.Id, row.Time, row.Amount, row.Class, [getattr(row, f"V{i}") for i in range(1, 29)])
+    v_list = [getattr(row, f"V{i}") for i in range(1, 29)]
+    # can use *v_list to unpack the list, model see list as 1 element so not good
+    transaction_list.append((row.Amount, row.Time, int(row.Class), *v_list))
+
+print("=================================================================================")
+for i in range(3):
+    print(f"Transition number {i + 1}: {transaction_list[i]}")
+
+print("=================================================================================\n=================================================================================\n=================================================================================")
+print(transaction_list)
