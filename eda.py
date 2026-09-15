@@ -1,5 +1,8 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.cluster import HDBSCAN, MiniBatchKMeans
+from sklearn.preprocessing import StandardScaler
 import os
 
 random_state=42
@@ -16,6 +19,23 @@ print(df[df['Class'] == 0]['Amount'].describe())
 print("===Fraud===")
 print(df[df['Class'] == 1]['Amount'].sort_values(ascending=False).head(10))
 print(df[df['Class'] == 1]['Amount'].describe())
+
+behavior_features = ['Amount', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10',
+                     'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28']
+X = df[behavior_features]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+pca = PCA(n_components=5, random_state=42)
+X_pca = pca.fit_transform(X_scaled)
+
+kmeans = MiniBatchKMeans(n_clusters=1000, batch_size=2048, random_state=42)
+df['user_id'] = [f"{c:04d}" for c in kmeans.fit_predict(X_pca)]
+
+# Verify result
+print(f"Total Unique User Profiles: {df['user_id'].nunique()}")
+print(f"Noise Count: {(df['user_id'] == '-1').sum()}")
 
 df = df.sort_values(by="Time").reset_index(drop=True)
 
