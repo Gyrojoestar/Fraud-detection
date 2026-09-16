@@ -1,5 +1,8 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.cluster import HDBSCAN, MiniBatchKMeans
+from sklearn.preprocessing import StandardScaler
 import os
 
 random_state=42
@@ -17,26 +20,37 @@ print("===Fraud===")
 print(df[df['Class'] == 1]['Amount'].sort_values(ascending=False).head(10))
 print(df[df['Class'] == 1]['Amount'].describe())
 
-X = df.drop(columns=["Class"])
-y = df["Class"]
+behavior_features = ['Amount', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10',
+                     'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28']
+X = df[behavior_features]
 
-# use train test split to evenly split the data, keep = use to simulate real time transaction
-# add = add to supabase
-keep_1, add_1, keep_2, add_2 = train_test_split(X, y, test_size=0.5, random_state=random_state, stratify=y)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-keep_1 = keep_1.reset_index(drop=True)
-keep_2 = keep_2.reset_index(drop=True)
-add_1 = add_1.reset_index(drop=True)
-add_2 = add_2.reset_index(drop=True)
-# combine to make the full csv with class column, drop index column
-keep = pd.concat([keep_1, keep_2], axis=1).reset_index(drop=True)
-add = pd.concat([add_1, add_2], axis=1).reset_index(drop=True)
+pca = PCA(n_components=5, random_state=42)
+X_pca = pca.fit_transform(X_scaled)
+
+kmeans = MiniBatchKMeans(n_clusters=1000, batch_size=2048, random_state=42)
+df['user_id'] = [f"{c:04d}" for c in kmeans.fit_predict(X_pca)]
+
+# Verify result
+print(f"Total Unique User Profiles: {df['user_id'].nunique()}")
+print(f"Noise Count: {(df['user_id'] == '-1').sum()}")
+
+df = df.sort_values(by="Time").reset_index(drop=True)
+
+split_idx = int(len(df) * 0.90)
+
+keep = df.iloc[:split_idx]
+add = df.iloc[split_idx:]
+
+keep['Time'] = keep['Time'].astype(int)
+add['Time'] = add['Time'].astype(int)
+
+keep.columns = keep.columns.str.lower()
+add.columns = add.columns.str.lower()
 
 print(f"Length of dataset to keep: {len(keep)}, Length of dataset to add to supabase: {len(add)}")
-
-# change from float to int (1.0 to 1) for supabase compatibility, follow original dataset format
-keep["Time"] = keep_1["Time"].astype(int)
-add["Time"] = add_1["Time"].astype(int)
 
 df_list = [keep, add]
 output_path = ["creditCardSupabase.csv", "creditCardRealTime.csv"]

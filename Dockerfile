@@ -1,20 +1,23 @@
+# STEP 1: Base Image
+# TODO: Start from official python:3.11-slim base image
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
+# STEP 2: Set Working Directory
+# TODO: Set working directory inside container to /app
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
+# STEP 3: Dependency Caching Step
+# TODO: Copy requirements.txt into working directory first
 COPY requirements.txt .
+# TODO: Run pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# STEP 4: Copy Application Files
+# Copy the application module into the working directory used by Uvicorn.
+COPY backend/main.py ./main.py
 
+# STEP 5: Networking & Startup
+# TODO: EXPOSE port 8000
 EXPOSE 8000
-
-CMD ["python", "app.py"]
+# TODO: Define CMD to run uvicorn server on host "0.0.0.0" and port 8000
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
