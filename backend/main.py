@@ -1,7 +1,10 @@
 from typing import List
+import json
 import os
+from pathlib import Path
 import joblib
 import numpy as np
+from xgboost import XGBClassifier
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import mlflow
@@ -24,9 +27,28 @@ if sorted_runs.empty:
 
 top_model = sorted_runs.iloc[0]
 run_id = top_model['run_id']
-model_path = f"runs:/{run_id}/model"
+run = mlflow.get_run(run_id)
+model_history = run.data.tags.get("mlflow.log-model.history")
+artifact_root = Path(os.getenv("MLFLOW_ARTIFACT_ROOT", "/app/mlruns"))
+if model_history:
+    model_id = json.loads(model_history)[0]["model_id"]
+    model_path = artifact_root / str(exp.experiment_id) / "models" / model_id / "artifacts"
+else:
+    model_path = next(
+        (
+            model_file.parent
+            for model_file in artifact_root.glob(
+                f"{exp.experiment_id}/models/*/artifacts/MLmodel"
+            )
+            if f"run_id: {run_id}" in model_file.read_text()
+        ),
+        None,
+    )
+    if model_path is None:
+        raise RuntimeError(f"Model artifacts for run {run_id} not found in {artifact_root}")
 
-model = mlflow.xgboost.load_model(model_path)
+model = XGBClassifier()
+model.load_model(str(model_path / "model.ubj"))
 
 class TransactionRequest(BaseModel):
     # Expecting 29 features: V1-V28 + Amount
