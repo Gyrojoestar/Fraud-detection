@@ -1,17 +1,32 @@
 from typing import List
+import os
 import joblib
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+import mlflow
 
 app = FastAPI(title="Fraud Detection API", version="1.0")
 
-# Load model globally
-try:
-    model = joblib.load("model/model.pkl")
-except Exception:
-    model = None
-    print("no model to load.")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db"))
+exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
+if exp is None:
+    raise RuntimeError("MLflow experiment not found. Run train.py first.")
+
+sorted_runs = mlflow.search_runs(
+    experiment_ids=[exp.experiment_id], 
+    order_by=["metrics.pr_auc DESC"]
+)
+
+if sorted_runs.empty:
+    raise RuntimeError("No logged runs found in MLflow.")
+
+
+top_model = sorted_runs.iloc[0]
+run_id = top_model['run_id']
+model_path = f"runs:/{run_id}/model"
+
+model = mlflow.xgboost.load_model(model_path)
 
 class TransactionRequest(BaseModel):
     # Expecting 29 features: V1-V28 + Amount

@@ -13,9 +13,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # STEP 4: Copy Application Files
-# TODO: Copy model.pkl and main.py into working directory
-COPY main.py ./
-COPY model/model.pkl ./model/
+# Copy the application module into the working directory used by Uvicorn.
+COPY backend/main.py ./main.py
 
 # STEP 5: Networking & Startup
 # TODO: EXPOSE port 8000
