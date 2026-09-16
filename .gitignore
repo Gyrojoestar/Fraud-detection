@@ -8,3 +8,4 @@ mlruns/
 *.db
 *.pkl
 mlflow.db
+*.csv
