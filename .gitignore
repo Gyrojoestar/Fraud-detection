@@ -7,3 +7,4 @@ payload_cmd.txt
 mlruns/
 *.db
 *.pkl
+mlflow.db
