@@ -1,6 +1,6 @@
 import unittest
 from fastapi.testclient import TestClient
-from main import app
+from backend.main import app
 
 class TestHealthEndpoint(unittest.TestCase):
     def setUp(self):
