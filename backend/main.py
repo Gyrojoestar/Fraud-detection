@@ -8,47 +8,46 @@ from xgboost import XGBClassifier
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import mlflow
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Fraud Detection API", version="1.0")
+model = None
 
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db"))
-exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
-if exp is None:
-    raise RuntimeError("MLflow experiment not found. Run train.py first.")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model # initialised to None
+    
+    try:
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db"))
+        exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
 
-sorted_runs = mlflow.search_runs(
-    experiment_ids=[exp.experiment_id], 
-    order_by=["metrics.pr_auc DESC"]
-)
+        if exp is None:
+            raise RuntimeError("MLflow experiment not found. Run train.py first.")
+        
+        sorted_runs = mlflow.search_runs(
+            experiment_ids=[exp.experiment_id], 
+            order_by=["metrics.pr_auc DESC"]
+        )
 
-if sorted_runs.empty:
-    raise RuntimeError("No logged runs found in MLflow.")
+        if sorted_runs.empty:
+            raise RuntimeError("No logged runs found in MLflow.")
+        
+        top_model = sorted_runs.iloc[0]
+        top_run_id = top_model['run_id']
+        # "model" is stored in the metadata not an actual subfolder
+        model = mlflow.xgboost.load_model(f"runs:/{top_run_id}/model")
 
+    except Exception as e:
+        print(f"Warning: failed to load model. {e}")
+        #dont put checks here 
+        
+    
+    # everything below yield is ran after the server is shut down
+    yield
+    model = None # clear up memory
+    
+    
+app = FastAPI(title="Fraud Detection API", version="1.0", lifespan=lifespan)
 
-top_model = sorted_runs.iloc[0]
-run_id = top_model['run_id']
-run = mlflow.get_run(run_id)
-model_history = run.data.tags.get("mlflow.log-model.history")
-artifact_root = Path(os.getenv("MLFLOW_ARTIFACT_ROOT", "/app/mlruns"))
-if model_history:
-    model_id = json.loads(model_history)[0]["model_id"]
-    model_path = artifact_root / str(exp.experiment_id) / "models" / model_id / "artifacts"
-else:
-    model_path = next(
-        (
-            model_file.parent
-            for model_file in artifact_root.glob(
-                f"{exp.experiment_id}/models/*/artifacts/MLmodel"
-            )
-            if f"run_id: {run_id}" in model_file.read_text()
-        ),
-        None,
-    )
-    if model_path is None:
-        raise RuntimeError(f"Model artifacts for run {run_id} not found in {artifact_root}")
-
-model = XGBClassifier()
-model.load_model(str(model_path / "model.ubj"))
 
 class TransactionRequest(BaseModel):
     # Expecting 29 features: V1-V28 + Amount
