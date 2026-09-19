@@ -31,7 +31,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          python model/train.py
+          python model_training/train.py
           python -m pytest backend/tests/ -v
 
   docker-build:
