@@ -1,4 +1,5 @@
 import joblib
+from pathlib import Path
 import pandas as pd
 from sklearn.metrics import average_precision_score
 from sklearn.model_selection import train_test_split
@@ -12,7 +13,7 @@ from sklearn.datasets import make_classification
 import numpy as np
 import os
 
-data_path = "creditcard.csv"
+data_path = Path("creditcard.csv")
 mlflow.set_tracking_uri(
     os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db")
 )
