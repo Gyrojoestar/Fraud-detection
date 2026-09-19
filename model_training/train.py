@@ -21,8 +21,6 @@ mlflow.set_experiment("fraud_detection_xgboost")
 
 # STEP 1: Load Kaggle Data
 # TODO: Use pd.read_csv() to load 'creditcard.csv'.
-df = pd.read_csv(data_path)
-
 if data_path.exists():
     print("Loading real dataset...")
     df = pd.read_csv(data_path)
