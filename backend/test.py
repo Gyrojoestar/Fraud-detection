@@ -7,4 +7,4 @@ runs = mlflow.search_runs(experiment_ids=[exp.experiment_id], order_by=["metrics
 
 top_run_id = runs.iloc[0]["run_id"]
 print(f"Top Run ID: {top_run_id}")
-print(f"Model URI: runs:/{top_run_id}/model")
+print(f"Model URI: runs:/{top_run_id}")
