@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 model = None
 
+# default stuff
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model # initialised to None

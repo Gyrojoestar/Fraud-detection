@@ -9,3 +9,4 @@ mlruns/
 *.pkl
 mlflow.db
 *.csv
+test.py
