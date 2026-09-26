@@ -5,10 +5,12 @@ from pathlib import Path
 import joblib
 import numpy as np
 from xgboost import XGBClassifier
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 import mlflow
 from contextlib import asynccontextmanager
+import backend.database.conn as dblib
+from sqlalchemy.orm import Session
 
 model = None
 
@@ -18,7 +20,8 @@ async def lifespan(app: FastAPI):
     global model # initialised to None
     
     try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db"))
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
+        print(mlflow.get_tracking_uri())
         exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
 
         if exp is None:
@@ -49,10 +52,24 @@ async def lifespan(app: FastAPI):
     
 app = FastAPI(title="Fraud Detection API", version="1.0", lifespan=lifespan)
 
+def db_get():
+    db = dblib.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()  
 
 class TransactionRequest(BaseModel):
     # Expecting 29 features: V1-V28 + Amount
     features: List[float] = Field(..., min_length=29, max_length=29)
+    
+    @property
+    def amount(self) -> float:
+        return self.features[-1]  # The 29th element
+
+    @property
+    def pca_features(self) -> List[float]:
+        return self.features[:28] # V1 through V28
 
 @app.get("/health")
 def health():
@@ -62,7 +79,7 @@ def health():
     return {"status": "unhealthy", "model": "missing"}
 
 @app.post("/predict")
-def predict(request: TransactionRequest):
+def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     # TODO: Check model loaded, reshape array (1, 29), calculate proba, return JSON
     if model is None:
         raise HTTPException(status_code=500, detail="Model artifact not found")
@@ -71,4 +88,28 @@ def predict(request: TransactionRequest):
     probability = float(probability)
     fraud_proba = round(probability, 4)
     is_fraud = bool(probability > 0.5)
-    return {"Fraud probability": fraud_proba, "Is_fraud": is_fraud}
+    try:
+        new_transaction = dblib.RawTransaction(
+            amount=request.amount,
+            card_class=True, # Or pull this from a separate parameter if needed
+            **{f"v{i+1}": float(val) for i, val in enumerate(request.pca_features)}
+        )
+
+        db.add(new_transaction)
+        
+        db.flush() 
+        
+        new_prediction = dblib.ModelPred(
+            transaction_id=new_transaction.transaction_id,
+            pred_class=is_fraud, 
+            confidence_score=fraud_proba
+        )
+        db.add(new_prediction)
+        db.commit()
+        
+    except Exception as e:
+        db.rollback() 
+        raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+    
+    return fraud_proba, is_fraud, request.amount
+    
