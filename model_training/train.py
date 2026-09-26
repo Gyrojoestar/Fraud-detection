@@ -37,9 +37,8 @@ else:
     df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
     df['Class'] = y_dummy
 
-# Now this drop operation is 100% safe in both Local and CI environments!
-X = df.drop(columns=['Class', 'Time']).reset_index(drop=True)
-y = df['Class']
+# remove time cause redundant (time = time lapsed after first transaction)
+# no indication of time of day
 
 # TODO: Separate the target variable. The Kaggle dataset uses 'Class' as the target (1 = fraud, 0 = legit).
 X = df.drop(columns=['Class', 'Time']).reset_index(drop=True)
@@ -48,7 +47,6 @@ y = df['Class'].reset_index(drop=True)
 # STEP 2: Train/Test Split
 # TODO: Split X and y into train and test sets (80/20 ratio).
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-# Hint: Use stratify=y to maintain the extreme class imbalance in both sets.
 
 # STEP 3: Handle Class Imbalance & Train Model
 # TODO: Calculate 'scale_pos_weight' for XGBoost (number of negative class / number of positive class).
