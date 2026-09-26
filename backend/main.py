@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     global model # initialised to None
     
     try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db"))
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
         print(mlflow.get_tracking_uri())
         exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
 
@@ -110,4 +110,6 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     except Exception as e:
         db.rollback() 
         raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+    
+    return fraud_proba, is_fraud, request.amount
     

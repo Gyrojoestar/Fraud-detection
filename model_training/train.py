@@ -14,9 +14,7 @@ import numpy as np
 import os
 
 data_path = Path("creditcard.csv")
-mlflow.set_tracking_uri(
-    os.getenv("MLFLOW_TRACKING_URI", "sqlite:///D:/fraud-detection/mlflow.db")
-)
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
 mlflow.set_experiment("fraud_detection_xgboost")
 
 # STEP 1: Load Kaggle Data
