@@ -116,7 +116,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     return fraud_proba, is_fraud, request.amount
     
 @app.api_route("/test-add-transaction", methods=["GET", "POST"])
-def test_add_transaction():
+def test_add_transaction(db: Session = Depends(db_get)):
     """
     Reads a random row from 'creditCardRealTime.csv' (or creditcard.csv) 
     and posts it through the transaction flow to save in Supabase.
@@ -130,26 +130,22 @@ def test_add_transaction():
     random_idx = random.randint(0, len(df) - 1)
     row = df.iloc[random_idx]
 
+    # save to supabase raw_transaction table
+    # change from np datatype to python datatype for supabase storage
+    try:
+        payload = {
+            "amount": float(row["amount"]),
+            "card_class": bool(int(row["class"])),
+            **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
+        }
+
+        new_transaction = dblib.RawTransaction(**payload)
+        db.add(new_transaction)
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+
     return {"status": "ok", "message": "test route reached", "row_index": int(random_idx), "row_data": row.to_dict()}
-    # # save to supabase raw_transaction table
-    # try:
-    #     new_transaction = dblib.RawTransaction(
-    #         amount=row['amount'],
-    #         card_class=True,
-    #         **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
-    #     )
-    #     db.add(new_transaction)
-    #     db.flush()  # Get the transaction_id
-
-    #     new_prediction = dblib.ModelPred(
-    #         transaction_id=new_transaction.transaction_id,
-    #         pred_class=False,  # Placeholder, you can run prediction here if needed
-    #         confidence_score=0.0  # Placeholder
-    #     )
-    #     db.add(new_prediction)
-    #     db.commit()
-
-    # except Exception as e:
-    #     db.rollback()
-    #     raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
     
