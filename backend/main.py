@@ -1,9 +1,11 @@
+import random
 from typing import List
 import json
 import os
 from pathlib import Path
 import joblib
 import numpy as np
+import pandas as pd
 from xgboost import XGBClassifier
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -112,4 +114,42 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
         raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
     
     return fraud_proba, is_fraud, request.amount
+    
+@app.api_route("/test-add-transaction", methods=["GET", "POST"])
+def test_add_transaction():
+    """
+    Reads a random row from 'creditCardRealTime.csv' (or creditcard.csv) 
+    and posts it through the transaction flow to save in Supabase.
+    """
+    csv_path = "card_cleaned_keep.csv"
+
+    if not os.path.exists(csv_path):
+        raise HTTPException(status_code=404, detail=f"CSV file '{csv_path}' not found.")
+
+    df = pd.read_csv(csv_path)
+    random_idx = random.randint(0, len(df) - 1)
+    row = df.iloc[random_idx]
+
+    return {"status": "ok", "message": "test route reached", "row_index": int(random_idx), "row_data": row.to_dict()}
+    # # save to supabase raw_transaction table
+    # try:
+    #     new_transaction = dblib.RawTransaction(
+    #         amount=row['amount'],
+    #         card_class=True,
+    #         **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
+    #     )
+    #     db.add(new_transaction)
+    #     db.flush()  # Get the transaction_id
+
+    #     new_prediction = dblib.ModelPred(
+    #         transaction_id=new_transaction.transaction_id,
+    #         pred_class=False,  # Placeholder, you can run prediction here if needed
+    #         confidence_score=0.0  # Placeholder
+    #     )
+    #     db.add(new_prediction)
+    #     db.commit()
+
+    # except Exception as e:
+    #     db.rollback()
+    #     raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
     
