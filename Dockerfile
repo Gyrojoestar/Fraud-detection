@@ -1,23 +1,28 @@
-# STEP 1: Base Image
+# Base Image
 # TODO: Start from official python:3.11-slim base image
 FROM python:3.12-slim
 
-# STEP 2: Set Working Directory
+# Set Working Directory
 # TODO: Set working directory inside container to /app
 WORKDIR /app
 
-# STEP 3: Dependency Caching Step
+# Dependency Caching Step
 # TODO: Copy requirements.txt into working directory first
 COPY requirements.txt .
 # TODO: Run pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# STEP 4: Copy Application Files
+# Copy Application Files
 # Copy the application module into the working directory used by Uvicorn.
-COPY backend/main.py ./main.py
+COPY backend /app/backend
+COPY model_training /app/model_training
 
-# STEP 5: Networking & Startup
+COPY mlflow.db /app/mlflow.db
+COPY mlruns /app/mlruns
+
+# Networking & Startup
 # TODO: EXPOSE port 8000
 EXPOSE 8000
+ENV PYTHONPATH=/app
 # TODO: Define CMD to run uvicorn server on host "0.0.0.0" and port 8000
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
