@@ -141,6 +141,7 @@ def test_add_transaction(db: Session = Depends(db_get)):
 
         new_transaction = dblib.RawTransaction(**payload)
         db.add(new_transaction)
+        db.flush()
         db.commit()
 
     except Exception as e:
