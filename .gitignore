@@ -10,3 +10,7 @@ mlruns/
 mlflow.db
 *.csv
 test.py
+cmd.txt
+logs/
+__pycache__/
+*py[cod]

@@ -1,13 +1,14 @@
+import random
 from typing import List
 import json
 import os
 from pathlib import Path
 import joblib
 import numpy as np
+import pandas as pd
 from xgboost import XGBClassifier
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
-import mlflow
 from contextlib import asynccontextmanager
 import backend.database.conn as dblib
 from sqlalchemy.orm import Session
@@ -20,25 +21,9 @@ async def lifespan(app: FastAPI):
     global model # initialised to None
     
     try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
-        print(mlflow.get_tracking_uri())
-        exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
-
-        if exp is None:
-            raise RuntimeError("MLflow experiment not found. Run train.py first.")
-        
-        sorted_runs = mlflow.search_runs(
-            experiment_ids=[exp.experiment_id], 
-            order_by=["metrics.pr_auc DESC"]
-        )
-
-        if sorted_runs.empty:
-            raise RuntimeError("No logged runs found in MLflow.")
-        
-        top_model = sorted_runs.iloc[0]
-        top_run_id = top_model['run_id']
-        # "model" is stored in the metadata not an actual subfolder
-        model = mlflow.xgboost.load_model(f"runs:/{top_run_id}/model")
+        model_path = Path(__file__).resolve().parent.parent / "model.ubj"
+        model = XGBClassifier()
+        model.load_model(model_path)
 
     except Exception as e:
         print(f"Warning: failed to load model. {e}")
@@ -112,4 +97,38 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
         raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
     
     return fraud_proba, is_fraud, request.amount
+    
+@app.api_route("/test-add-transaction", methods=["GET", "POST"])
+def test_add_transaction(db: Session = Depends(db_get)):
+    """
+    Reads a random row from 'creditCardRealTime.csv' (or creditcard.csv) 
+    and posts it through the transaction flow to save in Supabase.
+    """
+    csv_path = "card_cleaned_keep.csv"
+
+    if not os.path.exists(csv_path):
+        raise HTTPException(status_code=404, detail=f"CSV file '{csv_path}' not found.")
+
+    df = pd.read_csv(csv_path)
+    random_idx = random.randint(0, len(df) - 1)
+    row = df.iloc[random_idx]
+
+    # save to supabase raw_transaction table
+    # change from np datatype to python datatype for supabase storage
+    try:
+        payload = {
+            "amount": float(row["amount"]),
+            "card_class": bool(int(row["class"])),
+            **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
+        }
+
+        new_transaction = dblib.RawTransaction(**payload)
+        db.add(new_transaction)
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+
+    return {"status": "ok", "message": "test route reached", "row_index": int(random_idx), "row_data": row.to_dict()}
     
