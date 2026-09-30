@@ -16,10 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application module into the working directory used by Uvicorn.
 COPY backend /app/backend
 COPY model_training /app/model_training
-
-# copies the mlflow.db and mlruns directory into the working directory of the containter
-COPY mlflow.db /app/mlflow.db
-COPY mlruns /app/mlruns
+COPY model.ubj /app/model.ubj
 
 # Networking & Startup
 # TODO: EXPOSE port 8000

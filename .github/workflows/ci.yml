@@ -35,11 +35,24 @@ jobs:
           python model_training/train.py
           python -m pytest backend/tests/ -v
 
+      - name: Upload selected model
+        uses: actions/upload-artifact@v4
+        with:
+          name: selected-model
+          path: model.ubj
+          if-no-files-found: error
+
   docker-build:
     needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download selected model
+        uses: actions/download-artifact@v4
+        with:
+          name: selected-model
+          path: .
 
       - name: Build Docker image
         run: |

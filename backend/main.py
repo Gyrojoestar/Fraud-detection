@@ -9,7 +9,6 @@ import pandas as pd
 from xgboost import XGBClassifier
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
-import mlflow
 from contextlib import asynccontextmanager
 import backend.database.conn as dblib
 from sqlalchemy.orm import Session
@@ -22,25 +21,9 @@ async def lifespan(app: FastAPI):
     global model # initialised to None
     
     try:
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
-        print(mlflow.get_tracking_uri())
-        exp = mlflow.get_experiment_by_name("fraud_detection_xgboost")
-
-        if exp is None:
-            raise RuntimeError("MLflow experiment not found. Run train.py first.")
-        
-        sorted_runs = mlflow.search_runs(
-            experiment_ids=[exp.experiment_id], 
-            order_by=["metrics.pr_auc DESC"]
-        )
-
-        if sorted_runs.empty:
-            raise RuntimeError("No logged runs found in MLflow.")
-        
-        top_model = sorted_runs.iloc[0]
-        top_run_id = top_model['run_id']
-        # "model" is stored in the metadata not an actual subfolder
-        model = mlflow.xgboost.load_model(f"runs:/{top_run_id}/model")
+        model_path = Path(__file__).resolve().parent.parent / "model.ubj"
+        model = XGBClassifier()
+        model.load_model(model_path)
 
     except Exception as e:
         print(f"Warning: failed to load model. {e}")
