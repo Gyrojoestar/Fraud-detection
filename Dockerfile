@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend /app/backend
 COPY model_training /app/model_training
 
+# copies the mlflow.db and mlruns directory into the working directory of the containter
 COPY mlflow.db /app/mlflow.db
 COPY mlruns /app/mlruns
 
