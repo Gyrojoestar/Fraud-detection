@@ -30,8 +30,7 @@ class TestHealthEndpoint(unittest.TestCase):
         self.assertIn("model_params", data)
 
         params = data["model_params"]
-        self.assertIn("missing", params)
-        self.assertIsNone(params["missing"])
+        self.assertNotIn("missing", params)
 
         flat_values = [
             value
