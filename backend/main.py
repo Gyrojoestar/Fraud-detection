@@ -3,6 +3,7 @@ from typing import List
 import json
 import os
 from pathlib import Path
+import math
 import joblib
 import numpy as np
 import pandas as pd
@@ -55,6 +56,48 @@ class TransactionRequest(BaseModel):
     @property
     def pca_features(self) -> List[float]:
         return self.features[:28] # V1 through V28
+    
+def clean_parameter_json(params: dict) -> dict:
+    """
+    Recursively convert numpy data types in the parameters dictionary to native Python types
+    and removes any invalid values
+    """
+    def convert_value(value):
+        if isinstance(value, np.generic):
+            return value.item()  # Convert numpy scalar to native Python type
+        elif isinstance(value, dict):
+            return {k: convert_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [convert_value(v) for v in value]
+        else:
+            return value
+
+    cleaned_params = convert_value(params)
+    
+    # Remove any invalid values (e.g., NaN, inf)
+    def remove_invalid_values(d):
+        if isinstance(d, dict):
+            return {k: remove_invalid_values(v) for k, v in d.items() if not (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))}
+        elif isinstance(d, list):
+            return [remove_invalid_values(v) for v in d if not (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))]
+        else:
+            return d
+
+    cleaned_params = remove_invalid_values(cleaned_params)
+    
+    return cleaned_params
+    
+@app.get("/")
+def root():
+    message = "Welcome to the Fraud Detection API."
+    commands = {
+        "/predict": "POST endpoint to get fraud prediction for a transaction.",
+        "/health": "GET endpoint to check if the model is loaded and healthy.",
+        "/model-info": "GET endpoint to retrieve model parameters and feature importance.",
+        "/test-add-transaction": "GET/POST endpoint to test adding a random transaction from the CSV file.",
+        "/docs": "Interactive API documentation."
+    }
+    return {"message": message, "available_commands": commands}
 
 @app.get("/health")
 def health():
@@ -62,6 +105,18 @@ def health():
     if model is not None:
         return {"status": "healthy", "model": "loaded"}
     return {"status": "unhealthy", "model": "missing"}
+
+@app.get("/model-info")
+def model_info():
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model artifact not found")
+    
+    model_params = clean_parameter_json(model.get_params())
+    
+    # Return model parameters and feature importance
+    return {
+        "model_params": model_params
+    }
 
 @app.post("/predict")
 def predict(request: TransactionRequest, db: Session = Depends(db_get)):
@@ -76,7 +131,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     try:
         new_transaction = dblib.RawTransaction(
             amount=request.amount,
-            card_class=True, # Or pull this from a separate parameter if needed
+            card_class=is_fraud,
             **{f"v{i+1}": float(val) for i, val in enumerate(request.pca_features)}
         )
 
