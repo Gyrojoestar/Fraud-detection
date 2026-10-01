@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -28,7 +29,7 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-LOCAL_LAKE_PATH = "./data/parquet_lake"
+LOCAL_LAKE_PATH = Path("/opt/airflow/data/parquet_lake")
 
 # 2. Instantiate the DAG using the @dag decorator
 @dag(

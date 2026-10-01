@@ -1,11 +1,10 @@
 import os
 import urllib.parse
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 from dotenv import load_dotenv
 from sqlalchemy import (
     create_engine,
-    text,
     BigInteger,
     Boolean,
     DateTime,
@@ -22,16 +21,16 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.pool import NullPool
 
-# Load environment variables
 load_dotenv()
 
-raw_password = os.getenv("DATABASE_PW")
-if not raw_password:
-    raise ValueError("DATABASE_PW environment variable is missing!")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-encoded_password = urllib.parse.quote_plus(raw_password)
-
-DATABASE_URL = f"postgresql://postgres.avmyohbogdlamvppmesm:{encoded_password}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+if not DATABASE_URL:
+    raw_password = os.getenv("DATABASE_PW")
+    if not raw_password:
+        raise ValueError("Neither DATABASE_URL nor DATABASE_PW environment variables are set!")
+    encoded_password = urllib.parse.quote_plus(raw_password)
+    DATABASE_URL = f"postgresql://postgres.avmyohbogdlamvppmesm:{encoded_password}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
 
 engine = create_engine(DATABASE_URL, poolclass=NullPool, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
@@ -53,7 +52,6 @@ class RawTransaction(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    # Dynamic PCA Features (v1 to v28)
     locals().update(
         {f"v{i}": mapped_column(Float, nullable=False) for i in range(1, 29)}
     )
@@ -80,7 +78,6 @@ class ModelPred(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    # Point to a single RawTransaction instance, not a List
     raw_trans: Mapped["RawTransaction"] = relationship(
         back_populates="model_pred"
     )

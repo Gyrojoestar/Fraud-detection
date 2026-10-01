@@ -8,7 +8,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 import backend.database.conn as dblib
@@ -25,9 +25,12 @@ async def lifespan(app: FastAPI):
     
     try:
         model_path = Path(__file__).resolve().parent.parent / "model.ubj"
-        model = XGBClassifier()
-        model.load_model(model_path)
-
+        if model_path.exists():
+            model = XGBClassifier()
+            model.load_model(model_path)
+            print("Successfully loaded XGBoost model artifact.")
+        else:
+            print(f"Warning: Model artifact not found at {model_path}")
     except Exception as e:
         print(f"Warning: failed to load model. {e}")
         #dont put checks here 
@@ -58,6 +61,11 @@ class TransactionRequest(BaseModel):
     @property
     def pca_features(self) -> List[float]:
         return self.features[:28] # V1 through V28
+    
+class PredictResponse(BaseModel):
+    fraud_probability: float = Field(..., description="Estimated probability of transaction being fraudulent (0.0 to 1.0)")
+    is_fraud: bool = Field(..., description="Binary classification (True if fraud_probability > 0.5)")
+    amount: float = Field(..., description="Transaction amount")
     
 def clean_parameter_json(params: dict) -> dict:
     """
@@ -127,23 +135,24 @@ def model_info():
 
 @app.post("/predict")
 def predict(request: TransactionRequest, db: Session = Depends(db_get)):
-    # TODO: Check model loaded, reshape array (1, 29), calculate proba, return JSON
     if model is None:
-        raise HTTPException(status_code=500, detail="Model artifact not found")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="Model engine is currently unavailable."
+        )
+
     data = np.array(request.features).reshape(1, -1)
-    probability = model.predict_proba(data)[0][1]
-    probability = float(probability)
+    probability = float(model.predict_proba(data)[0][1])
     fraud_proba = round(probability, 4)
     is_fraud = bool(probability > 0.5)
+
     try:
         new_transaction = dblib.RawTransaction(
             amount=request.amount,
             card_class=is_fraud,
             **{f"v{i+1}": float(val) for i, val in enumerate(request.pca_features)}
         )
-
         db.add(new_transaction)
-        
         db.flush() 
         
         new_prediction = dblib.ModelPred(
@@ -156,9 +165,16 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
         
     except Exception as e:
         db.rollback() 
-        raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Database storage failed: {str(e)}"
+        )
     
-    return fraud_proba, is_fraud, request.amount
+    return PredictResponse(
+        fraud_probability=fraud_proba,
+        is_fraud=is_fraud,
+        amount=request.amount
+    )
     
 @app.api_route("/test-add-transaction", methods=["GET", "POST"])
 def test_add_transaction(db: Session = Depends(db_get)):
