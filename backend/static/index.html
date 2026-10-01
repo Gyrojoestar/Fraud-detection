@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Detection Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 20px; background-color: #f8f9fa; color: #333; }
+        h1 { color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { background-color: #2563eb; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+        button.secondary { background-color: #059669; }
+        button.secondary:hover { background-color: #047857; }
+        textarea { width: 100%; height: 80px; font-family: monospace; font-size: 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        pre { background: #0f172a; color: #38edf8; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .healthy { background: #dcfce7; color: #166534; }
+        .unhealthy { background: #fee2e2; color: #991b1b; }
+        .flex { display: flex; gap: 10px; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <h1>🛡️ Fraud Detection Control Panel</h1>
+
+    <!-- System Status -->
+    <div class="card flex" style="justify-content: space-between;">
+        <div>
+            <strong>API Status:</strong> <span id="statusBadge" class="badge">Checking...</span>
+        </div>
+        <button onclick="checkHealth()" style="padding: 6px 12px; font-size: 12px;">Refresh Health</button>
+    </div>
+
+    <!-- Test 1: Random Transaction to Supabase -->
+    <div class="card">
+        <h2>1. Ingest Random Transaction (`/test-add-transaction`)</h2>
+        <p style="color: #64748b; font-size: 14px;">Picks a random row from <code>card_cleaned_keep.csv</code> and saves it to Supabase.</p>
+        <button class="secondary" onclick="runTestAdd()">🎲 Send Random Transaction</button>
+        <h3>Result:</h3>
+        <pre id="testAddResult">Awaiting action...</pre>
+    </div>
+
+    <!-- Test 2: Custom Real-Time Prediction -->
+    <div class="card">
+        <h2>2. Live Model Inference (`/predict`)</h2>
+        <p style="color: #64748b; font-size: 14px;">Pass 29 numerical features (28 PCA components + 1 Amount value):</p>
+        <textarea id="featuresInput">[0.1, -0.2, 0.5, 1.1, -0.4, 0.8, -0.1, 0.3, -0.5, 0.2, -0.9, 0.4, -0.3, 0.1, -0.7, 0.2, 0.5, -0.1, 0.3, -0.2, 0.1, -0.4, 0.2, 0.1, -0.3, 0.2, 0.1, -0.1, 149.99]</textarea>
+        <div style="margin-top: 10px;">
+            <button onclick="runPredict()">🔍 Run Predict</button>
+        </div>
+        <h3>Result:</h3>
+        <pre id="predictResult">Awaiting action...</pre>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function checkHealth() {
+            const badge = document.getElementById('statusBadge');
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const data = await res.json();
+                if (data.status === 'healthy') {
+                    badge.className = 'badge healthy';
+                    badge.innerText = `Healthy (${data.model})`;
+                } else {
+                    badge.className = 'badge unhealthy';
+                    badge.innerText = 'Unhealthy (Model missing)';
+                }
+            } catch (err) {
+                badge.className = 'badge unhealthy';
+                badge.innerText = 'API Offline';
+            }
+        }
+
+        async function runTestAdd() {
+            const out = document.getElementById('testAddResult');
+            out.innerText = 'Sending transaction to Supabase...';
+            try {
+                const res = await fetch(`${API_BASE}/test-add-transaction`, { method: 'POST' });
+                const data = await res.json();
+                out.innerText = JSON.stringify(data, null, 2);
+            } catch (err) {
+                out.innerText = `Error: ${err.message}`;
+            }
+        }
+
+        async function runPredict() {
+            const out = document.getElementById('predictResult');
+            const rawText = document.getElementById('featuresInput').value;
+            
+            try {
+                const featuresArr = JSON.parse(rawText);
+                out.innerText = 'Evaluating model prediction...';
+                
+                const res = await fetch(`${API_BASE}/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ features: featuresArr })
+                });
+
+                const data = await res.json();
+                out.innerText = JSON.stringify(data, null, 2);
+            } catch (err) {
+                out.innerText = `Invalid Input or Request Error: ${err.message}`;
+            }
+        }
+
+        // Run health check on page load
+        checkHealth();
+    </script>
+</body>
+</html>
