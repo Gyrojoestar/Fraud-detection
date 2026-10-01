@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 import backend.database.conn as dblib
 from sqlalchemy.orm import Session
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 model = None
 
@@ -89,16 +91,21 @@ def clean_parameter_json(params: dict) -> dict:
     
 @app.get("/")
 def root():
-    message = "Welcome to the Fraud Detection API."
-    commands = {
-        "/predict": "POST endpoint to get fraud prediction for a transaction.",
-        "/health": "GET endpoint to check if the model is loaded and healthy.",
-        "/model-info": "GET endpoint to retrieve model parameters and feature importance.",
-        "/test-add-transaction": "GET/POST endpoint to test adding a random transaction from the CSV file.",
-        "/docs": "Interactive API documentation."
+    ui_path = Path(__file__).resolve().parent / "static" / "index.html"
+    if ui_path.exists():
+        return FileResponse(ui_path)
+    
+    # Fallback JSON if index.html is missing
+    return {
+        "message": "Welcome to the Fraud Detection API.",
+        "available_commands": {
+            "/predict": "POST endpoint to get fraud prediction for a transaction.",
+            "/health": "GET endpoint to check if the model is loaded and healthy.",
+            "/model-info": "GET endpoint to retrieve model parameters and feature importance.",
+            "/test-add-transaction": "GET/POST endpoint to test adding a random transaction from the CSV file.",
+            "/docs": "Interactive API documentation."
+        }
     }
-    return {"message": message, "available_commands": commands}
-
 @app.get("/health")
 def health():
     # TODO: Return status dict indicating if model is loaded
