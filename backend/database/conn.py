@@ -23,15 +23,14 @@ from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# connect to supabase database using environment variables
+raw_password = os.getenv("DATABASE_PW")
+if not raw_password:
+    raise ValueError("Neither DATABASE_URL nor DATABASE_PW environment variables are set!")
+encoded_password = urllib.parse.quote_plus(raw_password)
+DATABASE_URL = f"postgresql://postgres.avmyohbogdlamvppmesm:{encoded_password}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
 
-if not DATABASE_URL:
-    raw_password = os.getenv("DATABASE_PW")
-    if not raw_password:
-        raise ValueError("Neither DATABASE_URL nor DATABASE_PW environment variables are set!")
-    encoded_password = urllib.parse.quote_plus(raw_password)
-    DATABASE_URL = f"postgresql://postgres.avmyohbogdlamvppmesm:{encoded_password}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
-
+# create new SQLAAlchemy engine and sessionmaker to connect to the database
 engine = create_engine(DATABASE_URL, poolclass=NullPool, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
@@ -40,6 +39,7 @@ class Base(DeclarativeBase):
     pass
 
 
+# define SQLAlchemy ORM models for all database tables
 class RawTransaction(Base):
     __tablename__ = "raw_transactions"
 

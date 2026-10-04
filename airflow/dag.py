@@ -17,7 +17,7 @@ from model_training import train
 from model_training.train import train_model
 
 
-# 1. Define default arguments applied to all tasks and global variables for the DAG
+# define default arguments applied to all tasks and global variables for the DAG
 default_args = {
     'owner': 'AndrewJWY',
     'depends_on_past': False,
@@ -31,7 +31,7 @@ default_args = {
 
 LOCAL_LAKE_PATH = Path("/opt/airflow/data/parquet_lake")
 
-# 2. Instantiate the DAG using the @dag decorator
+# instantiate the DAG using the @dag decorator
 @dag(
     dag_id="fraud_detection_etl_pipeline",
     default_args=default_args,
@@ -44,7 +44,7 @@ LOCAL_LAKE_PATH = Path("/opt/airflow/data/parquet_lake")
 )
 def etl_pipeline():
 
-    # 3. Define individual tasks using the @task decorator
+    # define tasks using the @task decorator
     @task()
     def extract() -> dict:
         """Fetch new data from supabase."""
@@ -61,14 +61,14 @@ def etl_pipeline():
     def transform(raw_data: dict) -> list:
         """Process and clean data."""
         print(f"Transforming data: {raw_data}")
-        # expect the new data be be the same as the old data since its a train test split of the larger dataset
+        # expect the new data formatting to be the same as the old data since its a train test split of the larger dataset
         processed_data = raw_data["data_payload"]
         return processed_data
 
     @task()
     def load(processed_data: list):
         """Load data into a data warehouse or destination database."""
-        #create parquet file with new data in the data lake
+        # create parquet file with new data in the data lake
         os.makedirs(LOCAL_LAKE_PATH, exist_ok=True)
         df = pd.DataFrame(processed_data)
         execution_date = datetime.now().strftime("%Y-%m-%d")
@@ -79,19 +79,19 @@ def etl_pipeline():
     def retrain_model():
         """Retrain the model using the new data."""
         print("Retraining model...")
-        # Placeholder for model retraining logic
+        # retrieve all the data from the lake do a train test split
         df_full_dataset = pd.read_parquet("./data/parquet_lake/")
         X_train, X_test, y_train, y_test, df = train_model.data_preprocessing(df_full_dataset)
-        # This could involve loading the new data, training a model, and saving it
+        # retrain the model and save the best model to model.ubj
         train_model(X_train, X_test, y_train, y_test, df)
         print("Model retraining complete.")
 
-    # 4. Set downstream dependencies by chaining inputs and outputs
+    # set downstream dependencies by chaining inputs and outputs
     raw_data = extract()
     cleaned_data = transform(raw_data)
     load(cleaned_data)
     retrain_model()
     
     
-# 5. Call the function to register the DAG with the Airflow engine
+# call the function to register the DAG with the Airflow engine
 etl_pipeline()

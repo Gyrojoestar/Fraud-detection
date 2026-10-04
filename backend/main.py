@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
             model.load_model(model_path)
             print("Successfully loaded XGBoost model artifact.")
         else:
-            print(f"Warning: Model artifact not found at {model_path}")
+            print(f"Warning: Model artifact not found at {model_path}")         
     except Exception as e:
         print(f"Warning: failed to load model. {e}")
         #dont put checks here 
@@ -50,8 +50,9 @@ def db_get():
     finally:
         db.close()  
 
+# pydantic models for request and response validation
 class TransactionRequest(BaseModel):
-    # Expecting 29 features: V1-V28 + Amount
+    # Expecting 29 features: v1-v28 + Amount
     features: List[float] = Field(..., min_length=29, max_length=29)
     
     @property
@@ -60,21 +61,19 @@ class TransactionRequest(BaseModel):
 
     @property
     def pca_features(self) -> List[float]:
-        return self.features[:28] # V1 through V28
+        return self.features[:28] # v1 through v28
     
 class PredictResponse(BaseModel):
     fraud_probability: float = Field(..., description="Estimated probability of transaction being fraudulent (0.0 to 1.0)")
     is_fraud: bool = Field(..., description="Binary classification (True if fraud_probability > 0.5)")
     amount: float = Field(..., description="Transaction amount")
     
+
+# utility function to clean model parameters for JSON serialization    
 def clean_parameter_json(params: dict) -> dict:
-    """
-    Recursively convert numpy data types in the parameters dictionary to native Python types
-    and removes any invalid values
-    """
     def convert_value(value):
         if isinstance(value, np.generic):
-            return value.item()  # Convert numpy scalar to native Python type
+            return value.item()  # convert numpy scalar to native Python type
         elif isinstance(value, dict):
             return {k: convert_value(v) for k, v in value.items()}
         elif isinstance(value, list):
@@ -84,7 +83,7 @@ def clean_parameter_json(params: dict) -> dict:
 
     cleaned_params = convert_value(params)
     
-    # Remove any invalid values (e.g., NaN, inf)
+    # remove any invalid values
     def remove_invalid_values(d):
         if isinstance(d, dict):
             return {k: remove_invalid_values(v) for k, v in d.items() if not (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))}
@@ -103,7 +102,7 @@ def root():
     if ui_path.exists():
         return FileResponse(ui_path)
     
-    # Fallback JSON if index.html is missing
+    # fallback JSON if index.html is missing
     return {
         "message": "Welcome to the Fraud Detection API.",
         "available_commands": {
@@ -128,9 +127,10 @@ def model_info():
     
     model_params = clean_parameter_json(model.get_params())
     
-    # Return model parameters and feature importance
+    # return model parameters and feature importance
     return {
-        "model_params": model_params
+        "model_params": model_params,
+        "feature_importance": model.feature_importances_.tolist() if hasattr(model, "feature_importances_") else None
     }
 
 @app.post("/predict")
@@ -146,6 +146,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     fraud_proba = round(probability, 4)
     is_fraud = bool(probability > 0.5)
 
+    # store the transaction and prediction in the database then return in response
     try:
         new_transaction = dblib.RawTransaction(
             amount=request.amount,
@@ -176,12 +177,10 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
         amount=request.amount
     )
     
+    
+# test route to add a random transaction from the card_clean_keep.csv (56962 entries) CSV file to the database
 @app.api_route("/test-add-transaction", methods=["GET", "POST"])
 def test_add_transaction(db: Session = Depends(db_get)):
-    """
-    Reads a random row from 'creditCardRealTime.csv' (or creditcard.csv) 
-    and posts it through the transaction flow to save in Supabase.
-    """
     csv_path = "card_cleaned_keep.csv"
 
     if not os.path.exists(csv_path):
