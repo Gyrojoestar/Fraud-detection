@@ -179,7 +179,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     
     
 # test route to add a random transaction from the card_clean_keep.csv (56962 entries) CSV file to the database
-@app.api_route("/test-add-transaction", methods=["GET", "POST"])
+@app.api_route("/run-dag", methods=["GET", "POST"])
 def test_add_transaction(db: Session = Depends(db_get)):
     csv_path = "card_cleaned_keep.csv"
 
@@ -206,6 +206,8 @@ def test_add_transaction(db: Session = Depends(db_get)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+    
+    
 
     return {"status": "ok", "message": "test route reached", "row_index": int(random_idx), "row_data": row.to_dict()}
     

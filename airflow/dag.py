@@ -51,8 +51,8 @@ def etl_pipeline():
         print("Extracting data...")
         db = dblib.SessionLocal()
         # fetch all entries from 1 day ago
-        data_payload = db.query(dblib.FraudDetection).filter(
-            dblib.FraudDetection.created_at >= datetime.now() - timedelta(days=1)
+        data_payload = db.query(dblib.RawTransaction).filter(
+            dblib.RawTransaction.created_at >= datetime.now() - timedelta(days=1)
         ).all()
         data_payload = [entry.__dict__ for entry in data_payload]
         return {"data_payload": data_payload}
