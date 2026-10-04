@@ -1,12 +1,11 @@
 import os
 import urllib.parse
-from datetime import datetime
-from typing import List
 from dotenv import load_dotenv
 from sqlalchemy import (
     create_engine,
     BigInteger,
     Boolean,
+    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -14,9 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import (
     sessionmaker,
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
+    declarative_base,
     relationship,
 )
 from sqlalchemy.pool import NullPool
@@ -35,49 +32,44 @@ engine = create_engine(DATABASE_URL, poolclass=NullPool, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 
 # define SQLAlchemy ORM models for all database tables
 class RawTransaction(Base):
     __tablename__ = "raw_transactions"
 
-    transaction_id: Mapped[int] = mapped_column(
+    transaction_id = Column(
         BigInteger(), primary_key=True, autoincrement=True
     )
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
-    card_class: Mapped[bool] = mapped_column("class", Boolean, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    amount = Column(Float, nullable=False)
+    card_class = Column("class", Boolean, nullable=False)
+    created_at = Column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     locals().update(
-        {f"v{i}": mapped_column(Float, nullable=False) for i in range(1, 29)}
+        {f"v{i}": Column(Float, nullable=False) for i in range(1, 29)}
     )
 
-    model_pred: Mapped[List["ModelPred"]] = relationship(
-        back_populates="raw_trans"
-    )
+    model_pred = relationship("ModelPred", back_populates="raw_trans")
 
 
 class ModelPred(Base):
     __tablename__ = "model_predictions"
 
-    prediction_id: Mapped[int] = mapped_column(
+    prediction_id = Column(
         BigInteger(), primary_key=True, autoincrement=True
     )
-    transaction_id: Mapped[int] = mapped_column(
+    transaction_id = Column(
         BigInteger(),
         ForeignKey("raw_transactions.transaction_id"),
         nullable=False,
     )
-    pred_class: Mapped[bool] = mapped_column("class", Boolean, nullable=False)
-    confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    pred_class = Column("class", Boolean, nullable=False)
+    confidence_score = Column(Float, nullable=False)
+    created_at = Column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    raw_trans: Mapped["RawTransaction"] = relationship(
-        back_populates="model_pred"
-    )
+    raw_trans = relationship("RawTransaction", back_populates="model_pred")
