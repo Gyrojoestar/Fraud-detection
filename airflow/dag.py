@@ -13,8 +13,7 @@ from airflow.decorators import dag, task
 from airflow.utils.dates import days_ago
 
 import backend.database.conn as dblib
-from model_training import train
-from model_training.train import train_model
+from model_training.train import data_preprocessing, train_model
 
 
 # define default arguments applied to all tasks and global variables for the DAG
@@ -81,7 +80,7 @@ def etl_pipeline():
         print("Retraining model...")
         # retrieve all the data from the lake do a train test split
         df_full_dataset = pd.read_parquet("./data/parquet_lake/")
-        X_train, X_test, y_train, y_test, df = train_model.data_preprocessing(df_full_dataset)
+        X_train, X_test, y_train, y_test, df = data_preprocessing(df_full_dataset)
         # retrain the model and save the best model to model.ubj
         train_model(X_train, X_test, y_train, y_test, df)
         print("Model retraining complete.")
@@ -89,8 +88,9 @@ def etl_pipeline():
     # set downstream dependencies by chaining inputs and outputs
     raw_data = extract()
     cleaned_data = transform(raw_data)
-    load(cleaned_data)
-    retrain_model()
+    load_task = load(cleaned_data)
+    retrain_task = retrain_model()
+    load_task >> retrain_task
     
     
 # call the function to register the DAG with the Airflow engine

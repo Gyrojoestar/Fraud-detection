@@ -1,7 +1,0 @@
-python-dotenv
-psycopg2-binary
-pandas
-scikit-learn
-xgboost
-mlflow
-pyarrow

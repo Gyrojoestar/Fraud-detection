@@ -33,15 +33,14 @@ services:
       - postgres
     env_file:
       - .env
+    environment:
+      _PIP_ADDITIONAL_REQUIREMENTS: "scikit-learn xgboost mlflow pandas pyarrow psycopg2-binary python-dotenv"
     command: >
       bash -c "airflow db migrate &&
               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
 
   scheduler:
     image: fraud-detection-airflow:2.8.1
-    build:
-      context: .
-      dockerfile: airflow/Dockerfile
     container_name: airflow_scheduler
     restart: on-failure
     depends_on:
@@ -53,6 +52,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      _PIP_ADDITIONAL_REQUIREMENTS: "scikit-learn xgboost mlflow pandas pyarrow psycopg2-binary python-dotenv"
     volumes:
       - ./airflow:/opt/airflow/dags
       - ./backend:/opt/airflow/backend
@@ -63,9 +63,6 @@ services:
 
   webserver:
     image: fraud-detection-airflow:2.8.1
-    build:
-      context: .
-      dockerfile: airflow/Dockerfile
     container_name: airflow_webserver
     restart: on-failure
     depends_on:
@@ -78,6 +75,7 @@ services:
       AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       PYTHONPATH: /opt/airflow
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
+      _PIP_ADDITIONAL_REQUIREMENTS: "scikit-learn xgboost mlflow pandas pyarrow psycopg2-binary python-dotenv"
     volumes:
       - ./airflow:/opt/airflow/dags
       - ./backend:/opt/airflow/backend
