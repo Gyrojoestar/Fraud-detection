@@ -54,10 +54,18 @@ def etl_pipeline():
             db_entries = db.query(dblib.RawTransaction).filter(
                 dblib.RawTransaction.created_at >= datetime.now() - timedelta(days=1)
             ).all()
+            
+            # if no entries in the last 24h, fetch the latest 100 entries from the database
+            if not db_entries:
+                print("No transactions in last 24h. Fetching latest 100 entries from DB...")
+                db_entries = db.query(dblib.RawTransaction).order_by(
+                    dblib.RawTransaction.created_at.desc()
+                ).limit(100).all()
+                
             data_payload = []
             for entry in db_entries:
                 # extract columns explicitly via table metadata to strip ORM attributes
-                entry_dict = {c.name: getattr(entry, c.name) for c in entry.__table__.columns}
+                entry_dict = {c.key: getattr(entry, c.key) for c in entry.__table__.columns}
                 data_payload.append(entry_dict)
         finally:
             db.close()

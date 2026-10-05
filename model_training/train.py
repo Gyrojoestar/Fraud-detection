@@ -40,9 +40,11 @@ def data_preprocessing(data_path, test_size=0.2, random_state=42):
             df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
             df['Class'] = y_dummy
 
-    # remove time column as it's redundant (time = time lapsed after first transaction)
-    # no indication of time of day
-
+    # strip duplicates across all combined parquet files before training
+    if 'transaction_id' in df.columns:
+        df = df.drop_duplicates(subset=['transaction_id'])
+    else:
+        df = df.drop_duplicates()
     # convert all column names to lowercase
     df.columns = [str(col).lower() for col in df.columns]
     
