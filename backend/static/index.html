@@ -34,11 +34,11 @@
 
     <!-- Test 1: Random Transaction to Supabase -->
     <div class="card">
-        <h2>1. Ingest Random Transaction (`/test-add-transaction`)</h2>
+        <h2>1. Ingest Random Transaction (`/add-entry`)</h2>
         <p style="color: #64748b; font-size: 14px;">Picks a random row from <code>card_cleaned_keep.csv</code> and saves it to Supabase.</p>
         <button class="secondary" onclick="runTestAdd()">🎲 Send Random Transaction</button>
         <h3>Result:</h3>
-        <pre id="testAddResult">Awaiting action...</pre>
+        <pre id="addEntry">Awaiting action...</pre>
     </div>
 
     <!-- Test 2: Custom Real-Time Prediction -->
@@ -75,7 +75,7 @@
         }
 
         async function runTestAdd() {
-            const out = document.getElementById('testAddResult');
+            const out = document.getElementById('addEntry');
             out.innerText = 'Sending transaction to Supabase...';
             try {
                 const res = await fetch(`${API_BASE}/add-entry`, { method: 'POST' });
