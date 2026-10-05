@@ -20,30 +20,55 @@ MODEL_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "model.ubj"
 
 def data_preprocessing(data_path, test_size=0.2, random_state=42):
     # load Kaggle Data
-    if data_path.exists():
-        print("Loading real dataset...")
-        df = pd.read_csv(data_path)
+    if isinstance(data_path, pd.DataFrame):
+        df = data_path.copy()
     else:
-        print("Dataset CSV not found (CI Environment). Generating synthetic fallback data...")
-        # generate dummy data matching credit card dataset structure for ci workflow testing
-        X_dummy, y_dummy = make_classification(
-            n_samples=200, 
-            n_features=28, 
-            random_state=random_state
-        )
-        df = pd.DataFrame(X_dummy, columns=[f"V{i}" for i in range(1, 29)])
-        df['Time'] = np.random.randint(0, 1000, size=200)
-        df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
-        df['Class'] = y_dummy
+        data_path = Path(data_path)
+        if data_path.exists():
+            print("Loading real dataset...")
+            df = pd.read_csv(data_path)
+        else:
+            print("Dataset CSV not found (CI Environment). Generating synthetic fallback data...")
+            # generate dummy data matching credit card dataset structure for ci workflow testing
+            X_dummy, y_dummy = make_classification(
+                n_samples=200, 
+                n_features=28, 
+                random_state=random_state
+            )
+            df = pd.DataFrame(X_dummy, columns=[f"V{i}" for i in range(1, 29)])
+            df['Time'] = np.random.randint(0, 1000, size=200)
+            df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
+            df['Class'] = y_dummy
 
     # remove time column as it's redundant (time = time lapsed after first transaction)
     # no indication of time of day
 
-    X = df.drop(columns=['Class', 'Time']).reset_index(drop=True)
-    y = df['Class'].reset_index(drop=True)
+    # convert all column names to lowercase
+    df.columns = [str(col).lower() for col in df.columns]
+    
+    # standardize target column, change 'card_class' to 'class'
+    if 'card_class' in df.columns and 'class' not in df.columns:
+        df = df.rename(columns={'card_class': 'class'})
 
-    # train test split 80/20 with stratification to maintain class distribution
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    # extract target variable (class)
+    if 'class' in df.columns:
+        y = df['class'].reset_index(drop=True)
+    else:
+        raise KeyError("Target column 'class' not found in dataset.")
+
+    # drop non-feature metadata columns
+    cols_to_drop = [
+        'class',
+        'card_class', # failsafe check if present
+        'time', 'created_at', 
+        'transaction_id', '_sa_instance_state'
+    ]
+    X = df.drop(columns=cols_to_drop, errors='ignore').reset_index(drop=True)
+
+    # split the dataset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state, stratify=y
+    )
     
     return X_train, X_test, y_train, y_test, df
 
@@ -69,8 +94,12 @@ def export_best_model():
     )
 
 def train_model(X_train, X_test, y_train, y_test, df):
+    # ensure lowercase columns when calculating class balance
+    df.columns = [str(col).lower() for col in df.columns]
+    # target column lookup with fallback
+    target_col = 'class' if 'class' in df.columns else 'card_class'
     # handle use scale pos weight to address class imbalance in the dataset
-    scale_pos_weight = (df['Class']==0).sum()/(df['Class']==1).sum()
+    scale_pos_weight = (df[target_col]==0).sum()/max((df[target_col]==1).sum(), 1)
     # define model parameters for XGBoost classifier
     params = {
         "n_estimators":100, 

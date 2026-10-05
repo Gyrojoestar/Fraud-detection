@@ -22,8 +22,8 @@ default_args = {
     'depends_on_past': False,
     'start_date': days_ago(2),
     'email': ['andrewjwy@gmail.com'],
-    'email_on_failure': True,
-    'email_on_retry': True,
+    'email_on_failure': False,
+    'email_on_retry': False,
     'retries': 2,
     'retry_delay': timedelta(minutes=5),
 }
@@ -49,12 +49,18 @@ def etl_pipeline():
         """Fetch new data from supabase."""
         print("Extracting data...")
         db = dblib.SessionLocal()
-        # fetch all entries from 1 day ago
-        data_payload = db.query(dblib.RawTransaction).filter(
-            dblib.RawTransaction.created_at >= datetime.now() - timedelta(days=1)
-        ).all()
-        data_payload = [entry.__dict__ for entry in data_payload]
-        return {"data_payload": data_payload}
+        try:
+            # fetch all entries from 1 day ago
+            db_entries = db.query(dblib.RawTransaction).filter(
+                dblib.RawTransaction.created_at >= datetime.now() - timedelta(days=1)
+            ).all()
+            data_payload = []
+            for entry in db_entries:
+                # extract columns explicitly via table metadata to strip ORM attributes
+                entry_dict = {c.name: getattr(entry, c.name) for c in entry.__table__.columns}
+                data_payload.append(entry_dict)
+        finally:
+            db.close()
 
     @task()
     def transform(raw_data: dict) -> list:
@@ -79,7 +85,14 @@ def etl_pipeline():
         """Retrain the model using the new data."""
         print("Retraining model...")
         # retrieve all the data from the lake do a train test split
-        df_full_dataset = pd.read_parquet("./data/parquet_lake/")
+        print("Retraining model...")
+        parquet_files = list(LOCAL_LAKE_PATH.glob("*.parquet"))
+        
+        if not parquet_files:
+            print("No parquet files found in lake. Skipping retraining.")
+            return
+        # load all parquet files into a single DataFrame
+        df_full_dataset = pd.concat([pd.read_parquet(f) for f in parquet_files], ignore_index=True)
         X_train, X_test, y_train, y_test, df = data_preprocessing(df_full_dataset)
         # retrain the model and save the best model to model.ubj
         train_model(X_train, X_test, y_train, y_test, df)

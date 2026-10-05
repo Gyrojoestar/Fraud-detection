@@ -78,7 +78,7 @@
             const out = document.getElementById('testAddResult');
             out.innerText = 'Sending transaction to Supabase...';
             try {
-                const res = await fetch(`${API_BASE}/test-add-transaction`, { method: 'POST' });
+                const res = await fetch(`${API_BASE}/add-entry`, { method: 'POST' });
                 const data = await res.json();
                 out.innerText = JSON.stringify(data, null, 2);
             } catch (err) {

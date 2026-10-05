@@ -179,7 +179,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     
     
 # test route to add a random transaction from the card_clean_keep.csv (56962 entries) CSV file to the database
-@app.api_route("/run-dag", methods=["GET", "POST"])
+@app.api_route("/add-entry", methods=["GET", "POST"])
 def test_add_transaction(db: Session = Depends(db_get)):
     csv_path = "card_cleaned_keep.csv"
 
