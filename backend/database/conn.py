@@ -43,7 +43,7 @@ class RawTransaction(Base):
         BigInteger(), primary_key=True, autoincrement=True
     )
     amount = Column(Float, nullable=False)
-    card_class = Column("class", Boolean, nullable=False)
+    is_fraud = Column(Boolean, nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now()
     )

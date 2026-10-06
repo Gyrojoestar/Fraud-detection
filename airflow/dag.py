@@ -11,6 +11,7 @@ import pendulum
 from datetime import timedelta
 from airflow.decorators import dag, task
 from airflow.utils.dates import days_ago
+from airflow.exceptions import AirflowException
 
 import backend.database.conn as dblib
 from model_training.train import data_preprocessing, train_model
@@ -61,14 +62,27 @@ def etl_pipeline():
                 db_entries = db.query(dblib.RawTransaction).order_by(
                     dblib.RawTransaction.created_at.desc()
                 ).limit(100).all()
-                
+
+            if not db_entries: # <--- NEW/UPDATED LINE
+                raise AirflowException("Extraction Failed: Supabase database returned 0 records!")
+
             data_payload = []
             for entry in db_entries:
-                # extract columns explicitly via table metadata to strip ORM attributes
-                entry_dict = {c.key: getattr(entry, c.key) for c in entry.__table__.columns}
-                data_payload.append(entry_dict)
+                # Access via explicit Python attributes safely
+                row_dict = {
+                    "transaction_id": entry.transaction_id,
+                    "amount": entry.amount,
+                    "is_fraud": entry.is_fraud,
+                    "created_at": str(entry.created_at) if entry.created_at else None,
+                    **{f"v{i}": getattr(entry, f"v{i}") for i in range(1, 29)}
+                }
+                data_payload.append(row_dict)
+        except Exception as e: # <--- NEW/UPDATED LINE
+            print(f"Extraction error encountered: {e}") # <--- NEW/UPDATED LINE
+            raise AirflowException(f"Extract task terminated due to error: {str(e)}") # <--- NEW/UPDATED LINE
         finally:
             db.close()
+        return {"data_payload": data_payload}
 
     @task()
     def transform(raw_data: dict) -> list:

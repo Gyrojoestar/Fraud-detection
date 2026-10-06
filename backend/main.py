@@ -150,7 +150,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     try:
         new_transaction = dblib.RawTransaction(
             amount=request.amount,
-            card_class=is_fraud,
+            is_fraud=is_fraud,
             **{f"v{i+1}": float(val) for i, val in enumerate(request.pca_features)}
         )
         db.add(new_transaction)
@@ -195,7 +195,7 @@ def test_add_transaction(db: Session = Depends(db_get)):
     try:
         payload = {
             "amount": float(row["amount"]),
-            "card_class": bool(int(row["class"])),
+            "is_fraud": bool(int(row["is_fraud"])),
             **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
         }
 

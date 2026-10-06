@@ -38,7 +38,7 @@ def data_preprocessing(data_path, test_size=0.2, random_state=42):
             df = pd.DataFrame(X_dummy, columns=[f"V{i}" for i in range(1, 29)])
             df['Time'] = np.random.randint(0, 1000, size=200)
             df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
-            df['Class'] = y_dummy
+            df['is_fraud'] = y_dummy
 
     # strip duplicates across all combined parquet files before training
     if 'transaction_id' in df.columns:
@@ -48,20 +48,15 @@ def data_preprocessing(data_path, test_size=0.2, random_state=42):
     # convert all column names to lowercase
     df.columns = [str(col).lower() for col in df.columns]
     
-    # standardize target column, change 'card_class' to 'class'
-    if 'card_class' in df.columns and 'class' not in df.columns:
-        df = df.rename(columns={'card_class': 'class'})
-
-    # extract target variable (class)
-    if 'class' in df.columns:
-        y = df['class'].reset_index(drop=True)
+    # extract target variable
+    if 'is_fraud' in df.columns:
+        y = df['is_fraud'].reset_index(drop=True)
     else:
-        raise KeyError("Target column 'class' not found in dataset.")
+        raise KeyError("Target column 'is_fraud' not found in dataset.")
 
     # drop non-feature metadata columns
     cols_to_drop = [
-        'class',
-        'card_class', # failsafe check if present
+        'is_fraud',
         'time', 'created_at', 
         'transaction_id', '_sa_instance_state'
     ]
@@ -96,12 +91,10 @@ def export_best_model():
     )
 
 def train_model(X_train, X_test, y_train, y_test, df):
-    # ensure lowercase columns when calculating class balance
+    # ensure lowercase columns when calculating fraud class balance
     df.columns = [str(col).lower() for col in df.columns]
-    # target column lookup with fallback
-    target_col = 'class' if 'class' in df.columns else 'card_class'
-    # handle use scale pos weight to address class imbalance in the dataset
-    scale_pos_weight = (df[target_col]==0).sum()/max((df[target_col]==1).sum(), 1)
+    # account for class imbalance
+    scale_pos_weight = (df['is_fraud'] == 0).sum() / max((df['is_fraud'] == 1).sum(), 1)
     # define model parameters for XGBoost classifier
     params = {
         "n_estimators":100, 
