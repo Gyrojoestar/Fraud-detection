@@ -150,7 +150,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     try:
         new_transaction = dblib.RawTransaction(
             amount=request.amount,
-            card_class=is_fraud,
+            is_fraud=is_fraud,
             **{f"v{i+1}": float(val) for i, val in enumerate(request.pca_features)}
         )
         db.add(new_transaction)
@@ -179,7 +179,7 @@ def predict(request: TransactionRequest, db: Session = Depends(db_get)):
     
     
 # test route to add a random transaction from the card_clean_keep.csv (56962 entries) CSV file to the database
-@app.api_route("/test-add-transaction", methods=["GET", "POST"])
+@app.api_route("/add-entry", methods=["GET", "POST"])
 def test_add_transaction(db: Session = Depends(db_get)):
     csv_path = "card_cleaned_keep.csv"
 
@@ -195,7 +195,7 @@ def test_add_transaction(db: Session = Depends(db_get)):
     try:
         payload = {
             "amount": float(row["amount"]),
-            "card_class": bool(int(row["class"])),
+            "is_fraud": bool(int(row["is_fraud"])),
             **{f"v{i+1}": float(row[f"v{i+1}"]) for i in range(28)}
         }
 
@@ -206,6 +206,8 @@ def test_add_transaction(db: Session = Depends(db_get)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
+    
+    
 
     return {"status": "ok", "message": "test route reached", "row_index": int(random_idx), "row_data": row.to_dict()}
     

@@ -20,30 +20,52 @@ MODEL_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "model.ubj"
 
 def data_preprocessing(data_path, test_size=0.2, random_state=42):
     # load Kaggle Data
-    if data_path.exists():
-        print("Loading real dataset...")
-        df = pd.read_csv(data_path)
+    if isinstance(data_path, pd.DataFrame):
+        df = data_path.copy()
     else:
-        print("Dataset CSV not found (CI Environment). Generating synthetic fallback data...")
-        # generate dummy data matching credit card dataset structure for ci workflow testing
-        X_dummy, y_dummy = make_classification(
-            n_samples=200, 
-            n_features=28, 
-            random_state=random_state
-        )
-        df = pd.DataFrame(X_dummy, columns=[f"V{i}" for i in range(1, 29)])
-        df['Time'] = np.random.randint(0, 1000, size=200)
-        df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
-        df['Class'] = y_dummy
+        data_path = Path(data_path)
+        if data_path.exists():
+            print("Loading real dataset...")
+            df = pd.read_csv(data_path)
+        else:
+            print("Dataset CSV not found (CI Environment). Generating synthetic fallback data...")
+            # generate dummy data matching credit card dataset structure for ci workflow testing
+            X_dummy, y_dummy = make_classification(
+                n_samples=200, 
+                n_features=28, 
+                random_state=random_state
+            )
+            df = pd.DataFrame(X_dummy, columns=[f"V{i}" for i in range(1, 29)])
+            df['Time'] = np.random.randint(0, 1000, size=200)
+            df['Amount'] = np.random.uniform(1.0, 500.0, size=200)
+            df['is_fraud'] = y_dummy
 
-    # remove time column as it's redundant (time = time lapsed after first transaction)
-    # no indication of time of day
+    # strip duplicates across all combined parquet files before training
+    if 'transaction_id' in df.columns:
+        df = df.drop_duplicates(subset=['transaction_id'])
+    else:
+        df = df.drop_duplicates()
+    # convert all column names to lowercase
+    df.columns = [str(col).lower() for col in df.columns]
+    
+    # extract target variable
+    if 'is_fraud' in df.columns:
+        y = df['is_fraud'].reset_index(drop=True)
+    else:
+        raise KeyError("Target column 'is_fraud' not found in dataset.")
 
-    X = df.drop(columns=['Class', 'Time']).reset_index(drop=True)
-    y = df['Class'].reset_index(drop=True)
+    # drop non-feature metadata columns
+    cols_to_drop = [
+        'is_fraud',
+        'time', 'created_at', 
+        'transaction_id', '_sa_instance_state'
+    ]
+    X = df.drop(columns=cols_to_drop, errors='ignore').reset_index(drop=True)
 
-    # train test split 80/20 with stratification to maintain class distribution
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    # split the dataset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state, stratify=y
+    )
     
     return X_train, X_test, y_train, y_test, df
 
@@ -69,8 +91,10 @@ def export_best_model():
     )
 
 def train_model(X_train, X_test, y_train, y_test, df):
-    # handle use scale pos weight to address class imbalance in the dataset
-    scale_pos_weight = (df['Class']==0).sum()/(df['Class']==1).sum()
+    # ensure lowercase columns when calculating fraud class balance
+    df.columns = [str(col).lower() for col in df.columns]
+    # account for class imbalance
+    scale_pos_weight = (df['is_fraud'] == 0).sum() / max((df['is_fraud'] == 1).sum(), 1)
     # define model parameters for XGBoost classifier
     params = {
         "n_estimators":100, 
