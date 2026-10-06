@@ -36,10 +36,10 @@ LOCAL_LAKE_PATH = Path("/opt/airflow/data/parquet_lake")
     dag_id="fraud_detection_etl_pipeline",
     default_args=default_args,
     description="An ETL pipeline for fraud detection data processing and model retraining",
-    # Set explicit timezone using pendulum to handle DST safely
-    schedule="@daily",       # Runs at midnight daily (or use Cron strings like "0 2 * * *")
-    catchup=False,           # Skips historical periods between start_date and today
-    max_active_runs=1,       # Prevents multiple instances running concurrently
+    # set explicit timezone using pendulum to handle DST safely
+    schedule="@daily",
+    catchup=False,
+    max_active_runs=1,       # prevents multiple instances running concurrently
     tags=["production", "etl"],
 )
 def etl_pipeline():
@@ -63,12 +63,12 @@ def etl_pipeline():
                     dblib.RawTransaction.created_at.desc()
                 ).limit(100).all()
 
-            if not db_entries: # <--- NEW/UPDATED LINE
+            if not db_entries:
                 raise AirflowException("Extraction Failed: Supabase database returned 0 records!")
 
             data_payload = []
             for entry in db_entries:
-                # Access via explicit Python attributes safely
+                # access via explicit Python attributes safely
                 row_dict = {
                     "transaction_id": entry.transaction_id,
                     "amount": entry.amount,
@@ -77,9 +77,9 @@ def etl_pipeline():
                     **{f"v{i}": getattr(entry, f"v{i}") for i in range(1, 29)}
                 }
                 data_payload.append(row_dict)
-        except Exception as e: # <--- NEW/UPDATED LINE
-            print(f"Extraction error encountered: {e}") # <--- NEW/UPDATED LINE
-            raise AirflowException(f"Extract task terminated due to error: {str(e)}") # <--- NEW/UPDATED LINE
+        except Exception as e:
+            print(f"Extraction error encountered: {e}")
+            raise AirflowException(f"Extract task terminated due to error: {str(e)}")
         finally:
             db.close()
         return {"data_payload": data_payload}
